@@ -5,7 +5,7 @@
 #include <vector>
 
 #define SEGMENT 20
-#define SEGMENT_XY 40
+#define SEGMENT_XY 42
 
 using namespace std;
 
@@ -47,7 +47,7 @@ void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<dou
 					bfunc[i][j] = 0;
 			}
 			else {
-				int tmpa = ((u[j + d - 1] - u[j]) == 0) ? 0 : (t - u[j]) / (u[j + d - 1] - u[j]),
+				double tmpa = ((u[j + d - 1] - u[j]) == 0) ? 0 : (t - u[j]) / (u[j + d - 1] - u[j]),
 					tmpb = ((u[j + d] - u[j + 1]) == 0) ? 0 : (u[j + d] - t) / (u[j + d] - u[j + 1]);
 
 				if (j + 1 > n)
@@ -58,11 +58,11 @@ void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<dou
 		}
 	}
 
-	/*for (int i = 0; i < d; i++) {
+	for (int i = 0; i < d; i++) {
 		for (int j = 0; j < n + 1; j++)
 			cout << bfunc[i][j] << ", ";
 		cout << endl;
-	}*/
+	}
 }
 
 void computeCurve(GLdouble *curve, GLdouble *cpa, int n, int d, vector<double> u, int umin, int umax)
@@ -71,10 +71,29 @@ void computeCurve(GLdouble *curve, GLdouble *cpa, int n, int d, vector<double> u
 	
 	/*coxDeBoor(bfunc, 0, n, d, u);
 	for (int i = 0; i < d; i++) {
-		for (int j = 0; j < n + 1; j++)
-			cout << bfunc[i][j] << ", ";
-		cout << endl;
+	for (int j = 0; j < n + 1; j++)
+	cout << bfunc[i][j] << ", ";
+	cout << endl;
 	}*/
+	//coxDeBoor(bfunc, 0.9, n, d, u);
+
+
+	double t = 0;
+	for (int i = 0; i < SEGMENT + 1; i++, t += (double)(umax - umin) / SEGMENT - 10e-9) {
+	//for (int i = 0; i < 1; i++, t += (double)(umax - umin) / SEGMENT) {
+		cout << t << endl;
+		coxDeBoor(bfunc, t, n, d, u);
+		curve[2 * i] = 0;
+		for (int j = 0; j < n + 1; j++)
+			curve[2 * i] += cpa[2 * j] * bfunc[d - 1][j];
+		curve[2 * i + 1] = 0;
+		for (int j = 0; j < n + 1; j++)
+			curve[2 * i + 1] += cpa[2 * j + 1] * bfunc[d - 1][j];
+	}
+
+	for (int i = 0; i < SEGMENT_XY; i++) {
+		cout << curve[i] << ", ";
+	}
 }
 
 void getControlPoint(GLFWwindow *window)
@@ -199,16 +218,22 @@ int main()
 	}
 	cout << "Please input " << cpnum << " control points:(by cursor)" << endl;
 
-	computeCurve(curve, cpa, n, d, u, umin, umax);
-
-	GLuint cpVBO;
+	GLuint cpVBO, curveVBO;
 	glGenBuffers(1, &cpVBO);
-	GLuint cpVAO;
+	glGenBuffers(1, &curveVBO);
+	GLuint cpVAO, curveVAO;
 	glGenVertexArrays(1, &cpVAO);
+	glGenVertexArrays(1, &curveVAO);
 
 	glBindVertexArray(cpVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, cpVBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(GLdouble) * cpnum * 2, cpa, GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(0, 2, GL_DOUBLE, GL_TRUE, 2 * sizeof(GLdouble), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(curveVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, curveVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLdouble) * SEGMENT_XY, curve, GL_DYNAMIC_DRAW);
 	glVertexAttribPointer(0, 2, GL_DOUBLE, GL_TRUE, 2 * sizeof(GLdouble), (GLvoid*)0);
 	glEnableVertexAttribArray(0);
 
@@ -238,7 +263,38 @@ int main()
 			glPointSize(20.0f);
 			glDrawArrays(GL_POINTS, 0, cpnum);
 
-			cout << "DRAWED." << endl;
+			// compute the B-Spline curve
+			computeCurve(curve, cpa, n, d, u, umin, umax);
+
+			/*GLdouble _curve[SEGMENT_XY];
+			int _curvenum = 0;
+			for (int i = 0; i < SEGMENT_XY; i += 2) {
+				if (curve[i] == 0 && curve[i + 1] == 0)
+					continue;
+				else {
+					_curve[_curvenum] = curve[i];
+					_curve[_curvenum + 1] = curve[i + 1];
+					_curvenum += 2;
+				}
+			}
+			for (int i = 0; i < _curvenum; i++) {
+				cout << _curve[i] << ", ";
+			}*/
+
+
+			// draw curve
+			glBindVertexArray(curveVAO);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(GLdouble) * SEGMENT_XY, curve, GL_DYNAMIC_DRAW);
+			glVertexAttribPointer(0, 2, GL_DOUBLE, GL_TRUE, 2 * sizeof(GLdouble), (GLvoid*)0);
+			glVertexAttrib3f(1, 0.1, 0.8, 0.1);
+			glLineWidth(5.0f);
+			glDrawArrays(GL_LINE_STRIP, 0, SEGMENT + 1);
+			/*glBindVertexArray(curveVAO);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(GLdouble) * _curvenum, _curve, GL_DYNAMIC_DRAW);
+			glVertexAttribPointer(0, 2, GL_DOUBLE, GL_TRUE, 2 * sizeof(GLdouble), (GLvoid*)0);
+			glVertexAttrib3f(1, 0.1, 0.8, 0.1);
+			glLineWidth(5.0f);
+			glDrawArrays(GL_LINE_STRIP, 0, _curvenum/2);*/
 
 			glBindVertexArray(0);
 			glfwSwapBuffers(window);
