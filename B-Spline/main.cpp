@@ -5,6 +5,7 @@
 #include <vector>
 
 #define SEGMENT 20
+#define SEGMENT_XY 40
 
 using namespace std;
 
@@ -34,6 +35,47 @@ const GLchar *fragmentShaderSource =
 "{\n"
 "	color = vec4(ex_color, 1.0);\n"
 "}\n";
+
+void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<double> u)
+{
+	for (int i = 0; i < d; i++) {
+		for (int j = 0; j < n + 1; j++) {
+			if (i == 0) {
+				if (t >= u[j] && t <= u[j + 1])
+					bfunc[i][j] = 1;
+				else
+					bfunc[i][j] = 0;
+			}
+			else {
+				int tmpa = ((u[j + d - 1] - u[j]) == 0) ? 0 : (t - u[j]) / (u[j + d - 1] - u[j]),
+					tmpb = ((u[j + d] - u[j + 1]) == 0) ? 0 : (u[j + d] - t) / (u[j + d] - u[j + 1]);
+
+				if (j + 1 > n)
+					bfunc[i][j] = tmpa * bfunc[i - 1][j];
+				else
+					bfunc[i][j] = (tmpa * bfunc[i - 1][j]) + (tmpb * bfunc[i - 1][j + 1]);
+			}
+		}
+	}
+
+	/*for (int i = 0; i < d; i++) {
+		for (int j = 0; j < n + 1; j++)
+			cout << bfunc[i][j] << ", ";
+		cout << endl;
+	}*/
+}
+
+void computeCurve(GLdouble *curve, GLdouble *cpa, int n, int d, vector<double> u, int umin, int umax)
+{
+	vector<vector<double>> bfunc(d, vector<double>(n + 1));
+	
+	/*coxDeBoor(bfunc, 0, n, d, u);
+	for (int i = 0; i < d; i++) {
+		for (int j = 0; j < n + 1; j++)
+			cout << bfunc[i][j] << ", ";
+		cout << endl;
+	}*/
+}
 
 void getControlPoint(GLFWwindow *window)
 {
@@ -139,7 +181,7 @@ int main()
 	// input
 	int n, d, cpnum, unum;
 	double umin, umax;
-	GLdouble *cpa;
+	GLdouble *cpa, curve[SEGMENT_XY];
 	vector<double> u;
 
 	cout << "Please input the parameter n and d:" << endl;
@@ -156,6 +198,8 @@ int main()
 		u.push_back(tmp);
 	}
 	cout << "Please input " << cpnum << " control points:(by cursor)" << endl;
+
+	computeCurve(curve, cpa, n, d, u, umin, umax);
 
 	GLuint cpVBO;
 	glGenBuffers(1, &cpVBO);
