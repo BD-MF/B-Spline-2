@@ -39,33 +39,18 @@ const GLchar *fragmentShaderSource =
 void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<double> u)
 {
 	for (int i = 0; i < d; i++) {
-		for (int j = 0; j < n + d + 1; j++) {
+		for (int j = 0; j < n + 1; j++) {
 			if (i == 0) {
-				if (j + 1 < n + d + 1) {
-					if (t >= u[j] && t <= u[j + 1])
-						bfunc[i][j] = 1;
-					else
-						bfunc[i][j] = 0;
-				}
-				else {
-					if (t >= u[j])
-						bfunc[i][j] = 1;
-					else
-						bfunc[i][j] = 0;
-				}
+				if (t >= u[j] && t <= u[j + 1])
+					bfunc[i][j] = 1;
+				else
+					bfunc[i][j] = 0;
 			}
 			else {
-				double tmpa, tmpb;
-				if (j + d - 1 < n + d + 1)
-					tmpa = ((u[j + d - 1] - u[j]) == 0) ? 0 : (t - u[j]) / (u[j + d - 1] - u[j]);
-				else
-					tmpa = 0;
-				if (j + d < n + d + 1)
+				double tmpa = ((u[j + d - 1] - u[j]) == 0) ? 0 : (t - u[j]) / (u[j + d - 1] - u[j]),
 					tmpb = ((u[j + d] - u[j + 1]) == 0) ? 0 : (u[j + d] - t) / (u[j + d] - u[j + 1]);
-				else
-					tmpb = 0;
 
-				if (j + 1 >= n + d + 1)
+				if (j + 1 > n)
 					bfunc[i][j] = tmpa * bfunc[i - 1][j];
 				else
 					bfunc[i][j] = (tmpa * bfunc[i - 1][j]) + (tmpb * bfunc[i - 1][j + 1]);
@@ -74,7 +59,7 @@ void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<dou
 	}
 
 	for (int i = 0; i < d; i++) {
-		for (int j = 0; j < n + d + 1; j++)
+		for (int j = 0; j < n + 1; j++)
 			cout << bfunc[i][j] << ", ";
 		cout << endl;
 	}
@@ -82,9 +67,9 @@ void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<dou
 
 void computeCurve(GLdouble *curve, GLdouble *cpa, int n, int d, vector<double> u, double umin, double umax)
 {
-	vector<vector<double>> bfunc(d, vector<double>(n + d + 1));
+	vector<vector<double>> bfunc(d, vector<double>(n + 1));
 
-	double t = umin + 10e-10; // for the double compare error
+	double t = umin;
 	for (int i = 0; i < SEGMENT + 1; i++, t += (double)(umax - umin) / SEGMENT) {
 		cout << t << endl;
 		coxDeBoor(bfunc, t, n, d, u);
@@ -94,12 +79,6 @@ void computeCurve(GLdouble *curve, GLdouble *cpa, int n, int d, vector<double> u
 		curve[2 * i + 1] = 0;
 		for (int j = 0; j < n + 1; j++)
 			curve[2 * i + 1] += cpa[2 * j + 1] * bfunc[d - 1][j];
-
-		// for the double compare error
-		if (i == 0)
-			t -= 10e-10;
-		if (i == SEGMENT - 1)
-			t -= 10e-10;
 	}
 
 	for (int i = 0; i < SEGMENT_XY; i++) {
@@ -111,7 +90,7 @@ void getControlPoint(GLFWwindow *window)
 {
 	double xpos, ypos, xposNDC, yposNDC;
 	int width, height;
-
+	
 	glfwGetCursorPos(window, &xpos, &ypos);
 	glfwGetWindowSize(window, &width, &height);
 	cout << "getCursoPos: (" << xpos << ", " << ypos << ")" << endl;
@@ -130,7 +109,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mode)
 {
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
 		mouseCount++;
 		getControlPoint(window);
 	}
@@ -144,7 +123,7 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-
+	
 	GLFWwindow *window = glfwCreateWindow(800, 800, "B-Spline", nullptr, nullptr);
 	if (window == nullptr) {
 		cout << "Failed to create GLFW window" << endl;
@@ -162,7 +141,7 @@ int main()
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
-
+	
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	/****************************************/
@@ -257,7 +236,7 @@ int main()
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		if (mouseCount >= cpnum) {
+		if (mouseCount >= cpnum){
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 
