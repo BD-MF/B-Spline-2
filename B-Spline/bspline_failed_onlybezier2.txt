@@ -36,95 +36,64 @@ const GLchar *fragmentShaderSource =
 "	color = vec4(ex_color, 1.0);\n"
 "}\n";
 
-class Point
+void coxDeBoor(vector<vector<double>> &bfunc, double t, int n, int d, vector<double> u)
 {
-public:
-	Point() { x = 0.; y = 0.; z = 0.; };
-	// copy operator
-	Point operator=(const Point pt);
-	Point operator+(const Point pt) const;
-	//Point operator-(const Point pt) const;
-	Point operator*(double m) const;
-	Point operator/(double m) const;
-	double x, y, z;
-};
+	for (int i = 0; i < d; i++) {
+		for (int j = 0; j < n + d + 1; j++) {
+			if (i == 0) {
+				if (j + 1 < n + d + 1) {
+					if (t >= u[j] && t <= u[j + 1])
+						bfunc[i][j] = 1;
+					else
+						bfunc[i][j] = 0;
+				}
+				else {
+					if (t >= u[j])
+						bfunc[i][j] = 1;
+					else
+						bfunc[i][j] = 0;
+				}
+			}
+			else {
+				double tmpa, tmpb;
+				if (j + d - 1 < n + d + 1)
+					tmpa = ((u[j + d - 1] - u[j]) == 0) ? 0 : (t - u[j]) / (u[j + d - 1] - u[j]);
+				else
+					tmpa = 0;
+				if (j + d < n + d + 1)
+					tmpb = ((u[j + d] - u[j + 1]) == 0) ? 0 : (u[j + d] - t) / (u[j + d] - u[j + 1]);
+				else
+					tmpb = 0;
 
-Point Point::operator=(const Point pt)
-{
-	x = pt.x;
-	y = pt.y;
-	z = pt.z;
-	return *this;
-}
-Point Point::operator+(const Point pt) const
-{
-	Point temp;
-	temp.x = x + pt.x;
-	temp.y = y + pt.y;
-	temp.z = z + pt.z;
-	return temp;
-}
-Point Point::operator*(double m) const
-{
-	Point temp;
-	temp.x = x*m;
-	temp.y = y*m;
-	temp.z = z*m;
-	return temp;
-}
-Point Point::operator/(double m) const
-{
-	Point temp;
-	temp.x = x / m;
-	temp.y = y / m;
-	temp.z = z / m;
-	return temp;
-}
+				if (j + 1 >= n + d + 1)
+					bfunc[i][j] = tmpa * bfunc[i - 1][j];
+				else
+					bfunc[i][j] = (tmpa * bfunc[i - 1][j]) + (tmpb * bfunc[i - 1][j + 1]);
+			}
+		}
+	}
 
-Point deBoor(int k, int degree, int i, double x, vector<double> knots, Point *ctrlPoints)
-{   // Please see wikipedia page for detail
-	// note that the algorithm here kind of traverses in reverse order
-	// comapred to that in the wikipedia page
-	if (k == 0)
-		return ctrlPoints[i];
-	else
-	{
-		double alpha = (x - knots[i]) / (knots[i + degree + 1 - k] - knots[i]);
-		return (deBoor(k - 1, degree, i - 1, x, knots, ctrlPoints)*(1 - alpha) + deBoor(k - 1, degree, i, x, knots, ctrlPoints)*alpha);
+	for (int i = 0; i < d; i++) {
+		for (int j = 0; j < n + d + 1; j++)
+			cout << bfunc[i][j] << ", ";
+		cout << endl;
 	}
 }
 
-int whichInterval(double x, vector<double> knot, int ti)
+void computeCurve(GLdouble *curve, GLdouble *cpa, int n, int d, vector<double> u, double umin, double umax)
 {
-	for (int i = 1; i<ti - 1; i++)
-	{
-		if (x<knot[i])
-			return(i - 1);
-		else if (x == knot[ti - 1])
-			return(ti - 1);
-	}
-	return -1;
-}
-
-void computeCurve(GLdouble *curve, GLdouble *cpa, int cpnum, int n, int d, vector<double> u, double umin, double umax)
-{
-	Point *cpp = new Point[cpnum];
-	for (int i = 0; i < cpnum; i++) {
-		cpp[i].x = cpa[2 * i];
-		cpp[i].y = cpa[2 * i + 1];
-		cpp[i].z = 0.0;
-	}
+	vector<vector<double>> bfunc(d, vector<double>(n + d + 1));
 
 	double t = umin + 10e-10; // for the double compare error
 	for (int i = 0; i < SEGMENT + 1; i++, t += (double)(umax - umin) / SEGMENT) {
 		cout << t << endl;
-
-		int tmpi = whichInterval(t, u, u.size());
-		Point c = deBoor(d - 1, d - 1, tmpi, t, u, cpp);
-
-		curve[2 * i] = c.x;
-		curve[2 * i + 1] = c.y;
-
+		coxDeBoor(bfunc, t, n, d, u);
+		curve[2 * i] = 0;
+		for (int j = 0; j < n + 1; j++)
+			curve[2 * i] += cpa[2 * j] * bfunc[d - 1][j];
+		curve[2 * i + 1] = 0;
+		for (int j = 0; j < n + 1; j++)
+			curve[2 * i + 1] += cpa[2 * j + 1] * bfunc[d - 1][j];
 
 		// for the double compare error
 		if (i == 0)
@@ -304,11 +273,9 @@ int main()
 			glVertexAttrib3f(1, 1.0, 1.0, 1.0);
 			glPointSize(20.0f);
 			glDrawArrays(GL_POINTS, 0, cpnum);
-			glLineWidth(2.0f);
-			glDrawArrays(GL_LINE_STRIP, 0, cpnum);
 
 			// compute the B-Spline curve
-			computeCurve(curve, cpa, cpnum, n, d, u, u[d - 1], u[n + 1]);
+			computeCurve(curve, cpa, n, d, u, u[d-1], u[n+1]);
 
 			// draw curve
 			glBindVertexArray(curveVAO);
